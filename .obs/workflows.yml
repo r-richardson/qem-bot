@@ -1,0 +1,6 @@
+workflow:
+  steps:
+    - branch_package:
+        source_project: home:robert.richardson
+        source_package: qem-bot
+        target_project: qem-bot
