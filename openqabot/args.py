@@ -123,7 +123,7 @@ def get_parser() -> ArgumentParser:  # noqa: PLR0914, PLR0915
 
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug output")
 
-    parser.add_argument("-t", "--token", required=True, type=str, help="Token for qem dashboard api")
+    parser.add_argument("-t", "--token", required=False, type=str, help="Token for qem dashboard api")
     parser.add_argument("-g", "--gitea-token", required=False, type=str, help="Token for Gitea api")
 
     parser.add_argument(
@@ -237,6 +237,13 @@ def get_parser() -> ArgumentParser:  # noqa: PLR0914, PLR0915
         type=int,
         default=None,
         help="Only consider the specified PR (for manual debugging)",
+    )
+    cmdgiteasync.add_argument(
+        "--staging-label",
+        required=False,
+        type=str,
+        default="staging/In Progress",
+        help="The Gitea label used to identify staging PRs that should trigger openQA jobs",
     )
     cmdgiteasync.set_defaults(func=do_sync_gitea)
 

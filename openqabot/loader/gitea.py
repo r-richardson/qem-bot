@@ -402,6 +402,37 @@ def _get_project_results(obs_project: str, *, dry: bool, results: BuildResults) 
         return []
 
 
+def get_isos_from_obs(project_path: str, path: str) -> list[str]:
+    """Fetch list of ISO names from OBS for a given project and path."""
+    url = f"{OBS_DOWNLOAD_URL}/{project_path}/{path}/?jsontable"
+    try:
+        r = retried_requests.get(url)
+        if r.ok:
+            return [i["name"] for i in r.json().get("data", []) if i.get("name")]
+    except Exception as e:
+        log.debug("Failed to list ISOs from %s: %s", url, e)
+    return []
+
+
+def try_infer_archs_from_download_server(obs_project: str, results: BuildResults) -> None:
+    """Try to infer architectures by listing ISOs on the download server."""
+    project_path = obs_project.replace(":", ":/")
+
+    for path in ["product/iso", "iso"]:
+        for name in get_isos_from_obs(project_path, path):
+            if not name.endswith(".iso"):
+                continue
+            for arch in ARCHS:
+                if f"-{arch}-" in name or name.endswith(f"-{arch}.iso"):
+                    channel = f"{obs_project}:{arch}"
+                    results.projects.add(channel)
+                    results.successful.add("iso-inferred")
+
+        if results.projects:
+            log.info("Inferred channels from download server for %s: %s", obs_project, results.projects)
+            return
+
+
 def _process_obs_url(
     url: str,
     submission: dict[str, Any],
@@ -416,7 +447,11 @@ def _process_obs_url(
     log.debug("Checking OBS project %s", obs_project)
     relevant_archs = determine_relevant_archs_from_multibuild_info(obs_project, dry=dry)
 
-    for res in _get_project_results(obs_project, dry=dry, results=results):
+    res_list = _get_project_results(obs_project, dry=dry, results=results)
+    if not res_list and not dry:
+        try_infer_archs_from_download_server(obs_project, results)
+
+    for res in res_list:
         if is_build_result_relevant(res, relevant_archs):
             add_build_result(submission, res, results)
 
@@ -513,6 +548,7 @@ def make_submission_from_gitea_pr(
     only_successful_builds: bool,
     only_requested_prs: bool,
     dry: bool,
+    staging_label: str = "staging/In Progress",
 ) -> dict[str, Any] | None:
     """Create a dashboard-compatible submission record from a Gitea PR."""
     log.debug("Fetching info for PR git:%s from Gitea", pr.get("number", "?"))
@@ -523,6 +559,7 @@ def make_submission_from_gitea_pr(
         submission = {
             "number": number,
             "project": repo["name"],
+            "repo_name": repo_name,
             # "Emergency Maintenance Update", a flag used to raise a priority in scheduler
             # see openqabot/types/incidents.py#L227
             "emu": False,
@@ -538,6 +575,7 @@ def make_submission_from_gitea_pr(
             "channels": [],
             "url": pr["url"],
             "type": "git",
+            "labels": [l.get("name") for l in pr.get("labels", [])],
         }
         if dry:
             if number == 124:  # noqa: PLR2004
@@ -552,7 +590,9 @@ def make_submission_from_gitea_pr(
             reviews = get_json(reviews_url(repo_name, number), token)
             comments = get_json(comments_url(repo_name, number), token)
             files = get_json(changed_files_url(repo_name, number), token)
-        if add_reviews(submission, reviews) < 1 and only_requested_prs:
+
+        is_staging = staging_label in submission["labels"]
+        if add_reviews(submission, reviews) < 1 and only_requested_prs and not is_staging:
             log.info("PR git:%s skipped: No reviews by %s", number, OBS_GROUP)
             return None
         add_comments_and_referenced_build_results(submission, comments, dry=dry)
@@ -563,8 +603,12 @@ def make_submission_from_gitea_pr(
             return None
         add_packages_from_files(submission, token, files, dry=dry)
         if not submission["packages"]:
-            log.info("PR git:%s skipped: No packages found", number)
-            return None
+            if is_staging:
+                submission["packages"] = [f.get("filename", "").split("/")[-1] for f in files]
+
+            if not submission["packages"]:
+                log.info("PR git:%s skipped: No packages found", number)
+                return None
 
     except Exception:
         log.exception("Gitea API error: Unable to process PR git:%s", pr.get("number", "?"))
@@ -579,6 +623,7 @@ def get_submissions_from_open_prs(
     only_successful_builds: bool,
     only_requested_prs: bool,
     dry: bool,
+    staging_label: str = "staging/In Progress",
 ) -> list[dict[str, Any]]:
     """Convert a list of open Gitea PRs into dashboard submissions."""
     submissions = []
@@ -595,6 +640,7 @@ def get_submissions_from_open_prs(
                 only_successful_builds=only_successful_builds,
                 only_requested_prs=only_requested_prs,
                 dry=dry,
+                staging_label=staging_label,
             )
             for pr in open_prs
         ]

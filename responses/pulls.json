@@ -71,7 +71,7 @@
             "user": {"id": 31, "login": "…"},
             "title": "New Dummy test",
             "body": "",
-            "labels": [],
+            "labels": [{"name": "staging/In Progress"}],
             "requested_reviewers": [{"id": 377, "login": "autogits_obs_staging_bot"}],
             "requested_reviewers_teams": null,
             "state": "open",

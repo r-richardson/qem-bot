@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import logging
+import urllib3
+import urllib3.exceptions
 from functools import lru_cache
 from http import HTTPStatus
 from pprint import pformat
@@ -28,6 +30,7 @@ if TYPE_CHECKING:
 
 
 log = logging.getLogger("bot.openqa")
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 
 class OpenQAInterface:
@@ -37,6 +40,7 @@ class OpenQAInterface:
         """Initialize the OpenQAInterface class."""
         self.url: ParseResult = args.openqa_instance
         self.openqa = OpenQA_Client(server=self.url.netloc, scheme=self.url.scheme)
+        self.openqa.session.verify = False
         self.retries = number_of_retries()
         user_agent = {"User-Agent": "python-OpenQA_Client/qem-bot/1.0.0"}
         self.openqa.session.headers.update(user_agent)
@@ -57,7 +61,7 @@ class OpenQAInterface:
             " ".join(f"{k}={v}" for k, v in settings.items()),
         )
         try:
-            self.openqa.openqa_request("POST", "isos", data=settings, retries=self.retries)
+            return self.openqa.openqa_request("POST", "isos", data=settings, retries=self.retries)
         except RequestError as e:
             log.exception("openQA API error: %s", e.args[-1])
             log.exception("Job POST failed for settings: %s", pformat(settings))

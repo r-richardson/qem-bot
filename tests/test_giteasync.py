@@ -125,6 +125,7 @@ def args() -> Namespace:
         allow_build_failures=True,
         consider_unrequested_prs=False,
         pr_number=None,
+        staging_label="staging/manual",
         openqa_instance=urlparse("https://openqa.suse.de"),
     )
 

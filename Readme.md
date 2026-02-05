@@ -20,8 +20,8 @@ updates information about submissions and related openQA tests.
 
     >>> qem-bot.py --help
     usage: qem-bot [-h] [-c CONFIGS] [--dry] [--fake-data] [--dump-data] [-d]
-                   -t TOKEN [-g GITEA_TOKEN] [-i OPENQA_INSTANCE] [-s SINGLEARCH]
-                   [-r RETRY]
+                   [-t TOKEN] [-g GITEA_TOKEN] [-i OPENQA_INSTANCE]
+                   [-s SINGLEARCH] [-r RETRY]
                    {full-run,submissions-run,incidents-run,updates-run,smelt-sync,gitea-sync,sub-approve,inc-approve,sub-comment,inc-comment,sub-sync-results,inc-sync-results,aggr-sync-results,increment-approve,repo-diff,amqp} ...
 
     QEM-Dashboard, SMELT, Gitea and openQA connector
